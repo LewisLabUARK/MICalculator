@@ -1,0 +1,9 @@
+body{font-family:'Inter',sans-serif;background:#f8fafc}
+.spinner{border-top-color:#3498db;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+table{table-layout:fixed;width:100%}
+.pagination-controls{display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-size:.875rem}
+.pagination-controls button{background:#e2e8f0;border:1px solid #cbd5e0;padding:.25rem .75rem;border-radius:.375rem;cursor:pointer;transition:background-color .2s}
+.pagination-controls button:hover:not(:disabled){background:#cbd5e0}
+.pagination-controls button:disabled{opacity:.5;cursor:not-allowed}
