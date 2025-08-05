@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<title>Ordinal Regression & MIC Calculator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<!-- External Libraries -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+<!-- Observable‑Plot as ES module will be imported inside main.js -->
+<link rel="stylesheet" href="style.css">
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'sans-serif'] }
+      }
+    }
+  }
+</script>
+<link rel="icon" href="data:,">
+</head>
+<body class="text-gray-800">
+
+<div class="container mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
+  <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+    <header class="mb-8 text-center border-b pb-6">
+      <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Ordinal Regression & MIC Calculator</h1>
+      <p class="text-gray-600 mt-2">A browser-based tool using R and webR for advanced statistical analysis.</p>
+      <div id="loading-status" class="mt-4 flex items-center justify-center space-x-2 text-blue-600" role="status" aria-live="polite">
+        <div class="spinner w-5 h-5 border-4 border-gray-200 rounded-full"></div>
+        <span id="loading-message">Initializing R environment...</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- SECTION 1: Data Input -->
+      <section id="data-input-section" class="mb-8">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">1. Upload Data & Select Options</h2>
+        <div class="p-6 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
+          <div>
+            <label for="csv-file-input" class="block mb-2 text-sm font-medium text-gray-700">Upload CSV File:</label>
+            <input type="file" id="csv-file-input" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+            <p class="mt-1 text-xs text-gray-500">Your data must have headers and be in a long format.</p>
+          </div>
+          <div class="text-center">
+             <span class="text-sm text-gray-500">OR</span>
+          </div>
+           <div>
+            <button id="load-example-button" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+              Load Example Dataset
+            </button>
+          </div>
+          <div>
+            <label for="link-function-select" class="block mb-2 text-sm font-medium text-gray-700">Link Function for Ordinal Model:</label>
+            <select id="link-function-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+              <option value="logit" selected>Logit (proportional odds)</option>
+              <option value="probit">Probit</option>
+              <option value="cloglog">Complementary Log-Log</option>
+              <option value="loglog">Log-Log</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: Variable Mapping -->
+      <section id="variable-mapping-section" class="mb-8 hidden">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-l-4 border-blue-500 pl-3">2. Map Variables & Specify Model</h2>
+        <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <p class="text-sm text-gray-600 mb-6">Select columns from your data. The model formula will be built automatically, but you can customize it below.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label for="score-var-select" class="block mb-2 text-sm font-medium text-gray-700">Ordinal Score Variable (Dependent):</label>
+              <select id="score-var-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5"></select>
+            </div>
+            <div>
+              <label for="concentration-var-select" class="block mb-2 text-sm font-medium text-gray-700">Concentration Variable (Numeric):</label>
+              <select id="concentration-var-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5"></select>
+              <p class="mt-1 text-xs text-gray-500">The model uses log(Concentration + 1). Units are automatically parsed.</p>
+            </div>
+            <div>
+              <label for="factor1-var-select" class="block mb-2 text-sm font-medium text-gray-700">Grouping Factor 1:</label>
+              <select id="factor1-var-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5"></select>
+            </div>
+            <div>
+              <label for="factor2-var-select" class="block mb-2 text-sm font-medium text-gray-700">Grouping Factor 2 (Optional):</label>
+              <select id="factor2-var-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5"></select>
+            </div>
+          </div>
+          <div class="mt-6">
+            <label for="model-formula-rhs-input" class="block mb-2 text-sm font-medium text-gray-700">Model Formula (Right-Hand Side):</label>
+            <textarea id="model-formula-rhs-input" rows="2" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 font-mono" placeholder="Auto-generated from factor selections."></textarea>
+            <p class="mt-1 text-xs text-gray-500">
+              Available columns: <code id="available-vars-formula" class="text-xs bg-gray-200 text-gray-700 p-1 rounded"></code>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: Run Analysis -->
+      <section id="analysis-control-section" class="mb-8 text-center">
+        <button id="run-analysis-button" class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 text-lg shadow-md hover:shadow-lg" disabled>
+          Run Analysis
+        </button>
+      </section>
+
+      <!-- SECTION 4: Results -->
+      <section id="results-section" class="hidden">
+        <div id="error-output" class="hidden p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-100 border border-red-300" role="alert">
+          <span class="font-medium">Analysis Failed!</span>
+          <pre id="error-message" class="mt-2 font-mono whitespace-pre-wrap"></pre>
+        </div>
+        <div id="plot-output-container" class="mb-8">
+          <h3 class="text-xl font-semibold text-gray-800 mb-4">Plot Output</h3>
+          <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="mb-4 max-w-sm">
+              <label for="plot-type-select" class="block mb-2 text-sm font-medium text-gray-700">Plot Type:</label>
+              <select id="plot-type-select" class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                <option value="mic" selected>MIC Estimates</option>
+                <option value="ratio" id="plot-opt-ratio" disabled>Ratio MIC</option>
+                <option value="dod_ratio" id="plot-opt-dod" disabled>Difference-of-Differences (Ratio)</option>
+              </select>
+               <p id="plot-help-text" class="mt-1 text-xs text-gray-500 hidden"></p>
+            </div>
+            <div id="plot-output-div" class="flex justify-center items-center bg-white p-2 border rounded-md min-h-[300px]">Awaiting plot...</div>
+          </div>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Tabulated Results</h3>
+        <div class="space-y-6">
+          <div>
+            <details class="group" open>
+              <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                <h4 class="font-semibold text-gray-700">Ordinal Model Summary</h4>
+                <div class="flex items-center space-x-2">
+                  <button id="download-summary-coeffs" class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded-md">CSV Coeffs</button>
+                  <button id="download-summary-thresholds" class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded-md">CSV Thresh</button>
+                  <span class="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+                </div>
+              </summary>
+              <div id="model-summary-content" class="mt-2 p-4 border rounded-b-lg bg-white text-sm">Awaiting results...</div>
+            </details>
+          </div>
+          <div>
+            <details class="group" open>
+              <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                <h4 class="font-semibold text-gray-700">MIC Estimates</h4>
+                <div class="flex items-center space-x-2">
+                  <button id="download-mic" class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded-md">CSV</button>
+                  <span class="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+                </div>
+              </summary>
+              <div id="mic-table-content" class="mt-2 p-4 border rounded-b-lg bg-white text-sm">Awaiting results...</div>
+            </details>
+          </div>
+          <div id="pairwise-mic-output" class="hidden">
+            <details class="group">
+              <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                <h4 class="font-semibold text-gray-700">Pairwise Comparisons</h4>
+                 <div class="flex items-center space-x-2">
+                  <button id="download-delta-mic" class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded-md">CSV (Additive)</button>
+                  <button id="download-ratio-mic" class="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded-md">CSV (Ratio)</button>
+                  <span class="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+                </div>
+              </summary>
+              <div class="mt-2 p-4 border rounded-b-lg bg-white text-sm space-y-4">
+                  <h5 class="font-medium">Pairwise ΔMIC (Additive)</h5>
+                  <div id="delta-mic-table-content">Awaiting results...</div>
+                  <h5 class="font-medium pt-4 border-t">Pairwise Ratio MIC (Multiplicative)</h5>
+                  <div id="ratio-mic-table-content">Awaiting results...</div>
+              </div>
+            </details>
+          </div>
+          <div id="dod-output" class="hidden">
+            <details class="group">
+              <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                <h4 class="font-semibold text-gray-700">Difference-of-Differences (Interaction Effects)</h4>
+                <span class="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div class="mt-2 p-4 border rounded-b-lg bg-white text-sm space-y-4">
+                  <div id="dod-ratio-mic-table-content">Awaiting results...</div>
+                  <div id="dod-delta-mic-table-content" class="mt-4 pt-4 border-t">Awaiting results...</div>
+              </div>
+            </details>
+          </div>
+          <div>
+            <details class="group">
+              <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                <h4 class="font-semibold text-gray-700">Model Diagnostics</h4>
+                <span class="text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div class="mt-2 p-4 border rounded-b-lg bg-white text-sm">
+                <h5 class="font-medium">Proportional Odds Assumption Test</h5>
+                <p class="text-xs text-gray-500 mb-2">This test checks if the model coefficients are consistent across different thresholds of the ordinal variable. A significant p-value (e.g., < 0.05) suggests this assumption may be violated.</p>
+                <pre id="diagnostics-test-content" class="p-2 bg-gray-50 rounded font-mono text-xs whitespace-pre-wrap overflow-x-auto">Awaiting results...</pre>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Link to JavaScript file -->
+<script type="module" src="main.js"></script>
+
+</body>
+</html>
