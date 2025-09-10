@@ -1096,9 +1096,7 @@ el.runBtn.addEventListener("click", async () => {
           NULL
         )
         if (is.null(p)) return(NULL)
-        p + ggplot2::theme_minimal(base_size = 16) +
-            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
-                           legend.position = "bottom")
+        p
       }
       
       .GlobalEnv$.render_plot_svg <- function(type, w = 11, h = 7, pointsize = 14) {
@@ -1108,11 +1106,57 @@ el.runBtn.addEventListener("click", async () => {
         }
         p <- me$plots[[type]]
         if (is.null(p)) return(NA_character_)
+      
+        # --- dynamic height heuristic ---
+        # baseline = the 'h' passed from JS; add 0.12" per item beyond 12; clamp to [h, 40"]
+        n_items <- tryCatch(me$panel_count(type), error = function(e) 1L)
+        h_eff <- h + 0.12 * max(0, n_items - 12L)
+        h_eff <- max(h, min(h_eff, 40))
+      
         as.character(
-          svglite::stringSVG(code = print(p), width = w, height = h,
-                             pointsize = pointsize, standalone = TRUE)
+          svglite::stringSVG(
+            code = print(p),
+            width = w,
+            height = h_eff,
+            pointsize = pointsize,
+            standalone = TRUE
+          )
         )
       }
+
+      
+      # cache the data frames for sizing heuristics
+      .GlobalEnv$.mic_env$dfs <- list(
+        mic       = mic_df,
+        ratio     = ratio_df,
+        delta     = delta_df,
+        dod_ratio = dod_ratio_df,
+        dod_delta = dod_delta_df
+      )
+      
+      # count how many "items" a plot potentially shows (used to scale height)
+      .GlobalEnv$.mic_env$panel_count <- function(type) {
+        df <- .GlobalEnv$.mic_env$dfs[[type]]
+        if (is.null(df) || !is.data.frame(df) || !nrow(df)) return(1L)
+      
+        # columns that are numeric/measures; everything else is treated as grouping/labels
+        num_cols <- c("MIC","SE_LP","CI_Lower","CI_Upper","Ratio_MIC","Delta_MIC","Estimate",
+                      "log2Estimate","log2Lower","log2Upper","log2Ratio_MIC","SE_log2Ratio",
+                      "SE_logDoD","SE_DoD","P_value","DDlog2MIC","DDMIC")
+      
+        cand <- setdiff(names(df), num_cols)
+      
+        # If we have a Comparison label (common in DoD), use its unique count; else unique rows of group columns
+        if ("Comparison" %in% names(df)) {
+          return(max(1L, length(unique(df$Comparison))))
+        }
+        if (length(cand) > 0) {
+          return(max(1L, nrow(unique(df[cand]))))
+        }
+        # fallback: use row count
+        max(1L, nrow(df))
+      }
+
       
       final_list <- list(
         mics           = mic_df,
