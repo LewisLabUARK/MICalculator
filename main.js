@@ -184,35 +184,35 @@ function pickTransform(rhs, concName) {
   // log1p(x)  <->  expm1(y)
   if (has("log1p")) {
     return {
-      tf:  "function(x) log1p(x)",
-      inv: "function(y) expm1(y)"
+      tf:  "log1p",
+      inv: "expm1"
     };
   }
   // log10(x)  <->  10^y
   if (has("log10")) {
     return {
-      tf:  "function(x) log10(x)",
+      tf:  "log10",
       inv: "function(y) 10^y"
     };
   }
   // log(x)  <->  exp(y)     (natural log)
   if (has("log")) {
     return {
-      tf:  "function(x) log(x)",
-      inv: "function(y) exp(y)"
+      tf:  "log",
+      inv: "exp"
     };
   }
   // sqrt(x)  <->  y^2
   if (has("sqrt")) {
     return {
-      tf:  "function(x) sqrt(x)",
+      tf:  "sqrt",
       inv: "function(y) y^2"
     };
   }
   // default: identity
   return {
-    tf:  "function(x) x",
-    inv: "function(y) y"
+    tf:  "identity",
+    inv: "identity"
   };
 }
 
@@ -229,40 +229,6 @@ function renderTable(element, data, noDataMsg = "No data available.") {
     element.innerHTML = `<p class="text-gray-500 text-sm">${noDataMsg}</p>`;
     return;
   }
-    // make table sortable by clicking headers
-  const table = element.querySelector('table');
-  const ths = table.querySelectorAll('thead th');
-  ths.forEach((th, idx) => {
-    th.classList.add('cursor-pointer', 'select-none');
-    th.addEventListener('click', () => {
-      const key = headers[idx];
-      const current = th.dataset.sortDir === 'asc' ? 'asc' : (th.dataset.sortDir === 'desc' ? 'desc' : null);
-      const dir = current === 'asc' ? 'desc' : 'asc';
-      ths.forEach(t => t.removeAttribute('data-sort-dir'));
-      th.dataset.sortDir = dir;
-
-      const asNumber = (v) => {
-        if (typeof v === 'number') return { isNum: true, val: v };
-        const n = parseFloat(v);
-        return Number.isFinite(n) ? { isNum: true, val: n } : { isNum: false, val: String(v ?? '') };
-      };
-
-      const sorted = [...data].sort((a, b) => {
-        const A = asNumber(a[key]), B = asNumber(b[key]);
-        // numeric sorts before string to avoid "10 < 2" issues
-        if (A.isNum && B.isNum) {
-          return dir === 'asc' ? A.val - B.val : B.val - A.val;
-        }
-        const av = String(a[key] ?? ''), bv = String(b[key] ?? '');
-        if (av < bv) return dir === 'asc' ? -1 : 1;
-        if (av > bv) return dir === 'asc' ? 1 : -1;
-        return 0;
-      });
-
-      // re-render with the new order
-      renderTable(element, sorted, noDataMsg);
-    });
-  });
 
   const headers = Object.keys(data[0]);
 
@@ -280,8 +246,48 @@ function renderTable(element, data, noDataMsg = "No data available.") {
   }).join("");
 
   element.innerHTML =
-    `<div class="overflow-x-auto"><table class="w-full border-collapse table-auto"><thead><tr>${headHTML}</tr></thead><tbody>${bodyHTML}</tbody></table></div>`;
-} // <— missing brace added
+    `<div class="overflow-x-auto">
+       <table class="w-full border-collapse table-auto">
+         <thead><tr>${headHTML}</tr></thead>
+         <tbody>${bodyHTML}</tbody>
+       </table>
+     </div>`;
+
+  // Now the table exists; wire up sorting
+  const table = element.querySelector("table");
+  if (!table) return;
+
+  const ths = table.querySelectorAll("thead th");
+  ths.forEach((th, idx) => {
+    th.classList.add("cursor-pointer", "select-none");
+    th.title = "Click to sort";
+    th.addEventListener("click", () => {
+      const key = headers[idx];
+      const current = th.getAttribute("data-sort-dir");
+      const dir = current === "asc" ? "desc" : "asc";
+      ths.forEach(t => t.removeAttribute("data-sort-dir"));
+      th.setAttribute("data-sort-dir", dir);
+
+      const asNumber = (v) => {
+        if (typeof v === "number") return { isNum: true, val: v };
+        const n = Number(String(v).replace(/,/g, ""));
+        return Number.isFinite(n) ? { isNum: true, val: n } : { isNum: false, val: String(v ?? "") .toLowerCase() };
+      };
+
+      const sorted = [...data].sort((a, b) => {
+        const A = asNumber(a[key]), B = asNumber(b[key]);
+        if (A.isNum && B.isNum) return dir === "asc" ? A.val - B.val : B.val - A.val;
+        if (A.val < B.val) return dir === "asc" ? -1 : 1;
+        if (A.val > B.val) return dir === "asc" ? 1 : -1;
+        return 0;
+      });
+
+      // re-render with the sorted data (listeners will be reattached)
+      renderTable(element, sorted, noDataMsg);
+    });
+  });
+}
+
 
 // === p-value helpers (drop any other p helpers you had) ===
 const P_COL_REGEX = /^(p(_?value)?|P_value|P|Pr\(>\|z\|\))$/i;
